@@ -91,7 +91,12 @@ def cross(v1, v2):
         v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x,
     )
 
+def reflect(I, N):
+  Lm = mul(I, -1)
+  n = mul(N, 2 * dot(Lm, N))
+  return norm(sub(Lm, n))
 
+  
 def barycentric(A, B, C, P):
     cx, cy, cz = cross(
         V3(B.x - A.x, C.x - A.x, A.x - P.x), V3(B.y - A.y, C.y - A.y, A.y - P.y),

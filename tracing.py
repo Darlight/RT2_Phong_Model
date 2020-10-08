@@ -14,6 +14,9 @@ Proposito: Render of objects via Ray Intersect Algorithm
 import struct
 from collections import namedtuple
 from math_functions import *
+from color import color
+from intersect import Intersect
+from light import Light
 
 #Structures from the Bitmap Render
 def char(c):
@@ -26,10 +29,6 @@ def word(w):
 
 def dword(d):
     return struct.pack("=l", d)
-
-#Colors
-def color(r, g, b):
-    return bytes([b, g, r])
 
 
 #Colors
@@ -65,7 +64,7 @@ def writebmp(filename, width, height, pixels):
     # Pixel data (width x height x 3 pixels)
     for x in range(height):
         for y in range(width):
-            f.write(pixels[x][y])
+            f.write(pixels[x][y].toBytes())
     f.close()
 
 
@@ -83,15 +82,22 @@ class Sphere(object):
         l = length(L)
         d2 = l ** 2 - tca ** 2
         if d2 > self.radius ** 2:
-            return False
+            return None
         thc = (self.radius ** 2 - d2) ** 1 / 2
         t0 = tca - thc
         t1 = tca + thc
         if t0 < 0:
             t0 = t1
         if t0 < 0:
-            return False
-        return True
+            return None
+        
+        hit = sum(orig, mul(direction, t0))
+        normal = norm(sub(hit, self.center))
+        return Intersect(
+            distance=t0,
+            point=hit,
+            normal=normal
+        ) 
 
 
 #Raymap
@@ -100,16 +106,18 @@ class Raytracer(object):
         self.width = width
         self.height = height
         self.models = []
-        self.clear()
         self.current_color = WHITE
+        self.light = None
+        self.clear()
+        
 
     def clear(self):
-        self.pixels = [[PURPLISH for x in range(self.width)] for y in range(self.height)]
+        self.pixels = [[self.current_color for x in range(self.width)] for y in range(self.height)]
 
     def write(self, filename):
         writebmp(filename, self.width, self.height, self.pixels)
 
-    def finish(self, filename="output.bmp"):
+    def finish(self, filename="plushies.bmp"):
         self.render()
         self.write(filename)
 
@@ -120,10 +128,51 @@ class Raytracer(object):
             pass
 
     def cast_ray(self, orig, direction):
-        for model in self.models:
-            if model.ray_intersect(orig, direction):
-                return model.material.diffuse
-        return PURPLISH
+        material, intersect = self.scene_intersect(orig, direction)
+
+        if material is None:
+            return self.current_color
+
+        light_dir = norm(sub(self.light.position, intersect.point))
+        light_distance = length(sub(self.light.position, intersect.point))
+
+        offset_normal = mul(intersect.normal, 1.1)  # avoids intercept with itself
+        shadow_orig = sub(intersect.point, offset_normal) if dot(light_dir, intersect.normal) < 0 else sum(intersect.point, offset_normal)
+        shadow_material, shadow_intersect = self.scene_intersect(shadow_orig, light_dir)
+        shadow_intensity = 0
+
+        if shadow_material and length(sub(shadow_intersect.point, shadow_orig)) < light_distance:
+            shadow_intensity = 0.9
+
+        intensity = self.light.intensity * max(0, dot(light_dir, intersect.normal)) * (1 - shadow_intensity)
+
+        reflection = reflect(light_dir, intersect.normal)
+        specular_intensity = self.light.intensity * (
+        max(0, -dot(reflection, direction))**material.spec
+        )
+
+        diffuse = material.diffuse * intensity * material.albedo[0]
+        specular = color(255, 255, 255) * specular_intensity * material.albedo[1]
+        return diffuse + specular
+
+    
+    def scene_intersect(self, orig, direction):
+        zbuffer = float('inf')
+
+        material = None
+        intersect = None
+
+        for obj in self.models:
+            hit = obj.ray_intersect(orig, direction)
+            
+        if hit is not None:
+            if hit.distance < zbuffer:
+                zbuffer = hit.distance
+                material = obj.material
+                intersect = hit
+        
+        return material, intersect
+
 
     def render(self):
         fov = int(pi / 2)
