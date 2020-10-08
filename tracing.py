@@ -68,10 +68,7 @@ def writebmp(filename, width, height, pixels):
             f.write(pixels[x][y])
     f.close()
 
-#Color of the Material
-class Material(object):
-    def __init__(self, diffuse):
-        self.diffuse = diffuse
+
 
 #Circumference Object
 class Sphere(object):
