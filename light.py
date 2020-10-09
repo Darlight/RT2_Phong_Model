@@ -6,7 +6,7 @@ Lic. Dennis Aldana
 Mario Perdomo
 18029
 
-tracing.py
+light.py
 Proposito: Light for models
 """
 from math_functions import V3

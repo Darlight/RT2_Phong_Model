@@ -15,7 +15,6 @@ import struct
 from collections import namedtuple
 from math_functions import *
 from color import color
-from intersect import Intersect
 from light import Light
 
 #Structures from the Bitmap Render
@@ -37,67 +36,6 @@ PURPLISH = color(255, 204, 204)
 WHITE = color(255, 255, 255)
 
 
-#The file
-def writebmp(filename, width, height, pixels):
-    f = open(filename, "bw")
-
-    # File header (14 bytes)
-    f.write(char("B"))
-    f.write(char("M"))
-    f.write(dword(14 + 40 + width * height * 3))
-    f.write(dword(0))
-    f.write(dword(14 + 40))
-
-    # Image header (40 bytes)
-    f.write(dword(40))
-    f.write(dword(width))
-    f.write(dword(height))
-    f.write(word(1))
-    f.write(word(24))
-    f.write(dword(0))
-    f.write(dword(width * height * 3))
-    f.write(dword(0))
-    f.write(dword(0))
-    f.write(dword(0))
-    f.write(dword(0))
-
-    # Pixel data (width x height x 3 pixels)
-    for x in range(height):
-        for y in range(width):
-            f.write(pixels[x][y].toBytes())
-    f.close()
-
-
-
-#Circumference Object
-class Sphere(object):
-    def __init__(self, center, radius, material):
-        self.center = center
-        self.radius = radius
-        self.material = material
-
-    def ray_intersect(self, orig, direction):
-        L = sub(self.center, orig)
-        tca = dot(L, direction)
-        l = length(L)
-        d2 = l ** 2 - tca ** 2
-        if d2 > self.radius ** 2:
-            return None
-        thc = (self.radius ** 2 - d2) ** 1 / 2
-        t0 = tca - thc
-        t1 = tca + thc
-        if t0 < 0:
-            t0 = t1
-        if t0 < 0:
-            return None
-        
-        hit = sum(orig, mul(direction, t0))
-        normal = norm(sub(hit, self.center))
-        return Intersect(
-            distance=t0,
-            point=hit,
-            normal=normal
-        ) 
 
 
 #Raymap
@@ -106,16 +44,40 @@ class Raytracer(object):
         self.width = width
         self.height = height
         self.models = []
-        self.current_color = WHITE
+        self.currentbg_color = WHITE
         self.light = None
         self.clear()
         
 
     def clear(self):
-        self.pixels = [[self.current_color for x in range(self.width)] for y in range(self.height)]
+        self.pixels = [[self.currentbg_color for x in range(self.width)] for y in range(self.height)]
 
     def write(self, filename):
-        writebmp(filename, self.width, self.height, self.pixels)
+        f = open(filename, 'bw')
+        f.write(char('B'))
+        f.write(char('M'))
+        f.write(dword(14 + 40 + self.width * self.height * 3))
+        f.write(dword(0))
+        f.write(dword(14 + 40))
+
+        # Image header (40 bytes)
+        f.write(dword(40))
+        f.write(dword(self.width))
+        f.write(dword(self.height))
+        f.write(word(1))
+        f.write(word(24))
+        f.write(dword(0))
+        f.write(dword(self.width * self.height * 3))
+        f.write(dword(0))
+        f.write(dword(0))
+        f.write(dword(0))
+        f.write(dword(0))
+
+        # Pixel data (width x height x 3 pixels)
+        for x in range(self.height):
+            for y in range(self.width):
+                f.write(self.pixels[x][y].toBytes())
+        f.close()
 
     def finish(self, filename="plushies.bmp"):
         self.render()
@@ -131,7 +93,7 @@ class Raytracer(object):
         material, intersect = self.scene_intersect(orig, direction)
 
         if material is None:
-            return self.current_color
+            return self.currentbg_color
 
         light_dir = norm(sub(self.light.position, intersect.point))
         light_distance = length(sub(self.light.position, intersect.point))
@@ -153,7 +115,7 @@ class Raytracer(object):
 
         diffuse = material.diffuse * intensity * material.albedo[0]
         specular = color(255, 255, 255) * specular_intensity * material.albedo[1]
-        return diffuse + specular
+        return (diffuse + specular)
 
     
     def scene_intersect(self, orig, direction):
@@ -164,12 +126,11 @@ class Raytracer(object):
 
         for obj in self.models:
             hit = obj.ray_intersect(orig, direction)
-            
-        if hit is not None:
-            if hit.distance < zbuffer:
-                zbuffer = hit.distance
-                material = obj.material
-                intersect = hit
+            if hit is not None:
+                if hit.distance < zbuffer:
+                    zbuffer = hit.distance
+                    material = obj.material
+                    intersect = hit
         
         return material, intersect
 
@@ -184,6 +145,6 @@ class Raytracer(object):
                     * self.width
                     / self.height
                 )
-                j = -(2 * (y + 0.5) / self.height - 1) * tan(fov / 2)
+                j = (2 * (y + 0.5) / self.height - 1) * tan(fov / 2)
                 direction = norm(V3(i, j, -1))
-                self.pixels[y][x] = self.cast_ray(V3(0, 0, 0), direction)
+                self.pixels[y][x] = self.cast_ray(V3(1, 0, 0), direction)

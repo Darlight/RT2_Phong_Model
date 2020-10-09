@@ -6,7 +6,7 @@ Lic. Dennis Aldana
 Mario Perdomo
 18029
 
-tracing.py
+intersect.py
 Proposito: Intersection between models
 """
 class Intersect(object):
